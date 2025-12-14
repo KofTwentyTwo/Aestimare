@@ -125,6 +125,10 @@ class GitHubCollector:
       # Categorize repositories by activity
       org_data['repositories'] = self._categorize_activity(org_data['repositories'])
 
+      # Collect developer activity across all repositories
+      logger.info(f"  Collecting developer activity for {org_name}...")
+      org_data['developer_activity'] = self._collect_developer_activity(org_name, org_data['repositories'])
+
       return org_data
 
    def _get_all_repos(self, org_name: str) -> List[Dict]:
@@ -256,6 +260,266 @@ class GitHubCollector:
       """Get recent releases."""
       releases = self._gh_api(f'/repos/{org}/{repo}/releases?per_page=10')
       return releases if releases else []
+
+   def _collect_developer_activity(self, org_name: str, repositories: List[Dict]) -> Dict:
+      """Collect developer activity across all repositories for the past 12 months."""
+      logger.info("    Collecting commits, PRs, and issues for all developers...")
+      
+      # Calculate date range (12 months ago)
+      end_date = datetime.now()
+      start_date = end_date - timedelta(days=365)
+      since_param = start_date.isoformat()
+      
+      developer_stats = {}  # developer_login -> stats
+      
+      for repo in repositories:
+         repo_name = repo.get('name')
+         if not repo_name:
+            continue
+         
+         logger.info(f"      Analyzing activity in: {repo_name}")
+         
+         # Get commits for the past 12 months
+         commits = self._get_commits_since(org_name, repo_name, since_param)
+         
+         # Get pull requests
+         prs = self._get_pull_requests_detailed(org_name, repo_name, since_param)
+         
+         # Get issues
+         issues = self._get_issues_detailed(org_name, repo_name, since_param)
+         
+         # Aggregate by developer
+         for commit in commits:
+            author = commit.get('author', {})
+            if author:
+               login = author.get('login', 'unknown')
+               if login not in developer_stats:
+                  developer_stats[login] = {
+                     'login': login,
+                     'name': author.get('name', ''),
+                     'email': author.get('email', ''),
+                     'commits': [],
+                     'pull_requests': [],
+                     'issues': [],
+                     'repositories': set(),
+                     'total_commits': 0,
+                     'total_prs_created': 0,
+                     'total_prs_merged': 0,
+                     'total_issues_created': 0,
+                     'total_issues_closed': 0,
+                     'lines_added': 0,
+                     'lines_deleted': 0,
+                     'first_activity': None,
+                     'last_activity': None,
+                  }
+               
+               developer_stats[login]['repositories'].add(repo_name)
+               developer_stats[login]['total_commits'] += 1
+               developer_stats[login]['commits'].append({
+                  'repo': repo_name,
+                  'sha': commit.get('sha', '')[:7],
+                  'message': commit.get('commit', {}).get('message', '')[:100],
+                  'date': commit.get('commit', {}).get('author', {}).get('date', ''),
+                  'url': commit.get('html_url', ''),
+               })
+               
+               # Update activity dates
+               commit_date = commit.get('commit', {}).get('author', {}).get('date', '')
+               if commit_date:
+                  try:
+                     commit_dt = datetime.fromisoformat(commit_date.replace('Z', '+00:00'))
+                     if not developer_stats[login]['first_activity'] or commit_dt < developer_stats[login]['first_activity']:
+                        developer_stats[login]['first_activity'] = commit_dt
+                     if not developer_stats[login]['last_activity'] or commit_dt > developer_stats[login]['last_activity']:
+                        developer_stats[login]['last_activity'] = commit_dt
+                  except:
+                     pass
+         
+         # Process PRs
+         for pr in prs:
+            user = pr.get('user', {})
+            if user:
+               login = user.get('login', 'unknown')
+               if login not in developer_stats:
+                  developer_stats[login] = {
+                     'login': login,
+                     'name': user.get('name', ''),
+                     'email': '',
+                     'commits': [],
+                     'pull_requests': [],
+                     'issues': [],
+                     'repositories': set(),
+                     'total_commits': 0,
+                     'total_prs_created': 0,
+                     'total_prs_merged': 0,
+                     'total_issues_created': 0,
+                     'total_issues_closed': 0,
+                     'lines_added': 0,
+                     'lines_deleted': 0,
+                     'first_activity': None,
+                     'last_activity': None,
+                  }
+               
+               developer_stats[login]['repositories'].add(repo_name)
+               developer_stats[login]['total_prs_created'] += 1
+               
+               if pr.get('merged_at'):
+                  developer_stats[login]['total_prs_merged'] += 1
+               
+               developer_stats[login]['pull_requests'].append({
+                  'repo': repo_name,
+                  'number': pr.get('number'),
+                  'title': pr.get('title', '')[:100],
+                  'state': pr.get('state'),
+                  'merged': bool(pr.get('merged_at')),
+                  'created_at': pr.get('created_at', ''),
+                  'merged_at': pr.get('merged_at', ''),
+                  'additions': pr.get('additions', 0),
+                  'deletions': pr.get('deletions', 0),
+                  'url': pr.get('html_url', ''),
+               })
+               
+               developer_stats[login]['lines_added'] += pr.get('additions', 0)
+               developer_stats[login]['lines_deleted'] += pr.get('deletions', 0)
+         
+         # Process issues
+         for issue in issues:
+            user = issue.get('user', {})
+            if user:
+               login = user.get('login', 'unknown')
+               if login not in developer_stats:
+                  developer_stats[login] = {
+                     'login': login,
+                     'name': user.get('name', ''),
+                     'email': '',
+                     'commits': [],
+                     'pull_requests': [],
+                     'issues': [],
+                     'repositories': set(),
+                     'total_commits': 0,
+                     'total_prs_created': 0,
+                     'total_prs_merged': 0,
+                     'total_issues_created': 0,
+                     'total_issues_closed': 0,
+                     'lines_added': 0,
+                     'lines_deleted': 0,
+                     'first_activity': None,
+                     'last_activity': None,
+                  }
+               
+               developer_stats[login]['repositories'].add(repo_name)
+               developer_stats[login]['total_issues_created'] += 1
+               
+               if issue.get('state') == 'closed':
+                  developer_stats[login]['total_issues_closed'] += 1
+               
+               developer_stats[login]['issues'].append({
+                  'repo': repo_name,
+                  'number': issue.get('number'),
+                  'title': issue.get('title', '')[:100],
+                  'state': issue.get('state'),
+                  'created_at': issue.get('created_at', ''),
+                  'closed_at': issue.get('closed_at', ''),
+                  'url': issue.get('html_url', ''),
+               })
+      
+      # Convert sets to lists and calculate summary stats
+      for login, stats in developer_stats.items():
+         stats['repositories'] = sorted(list(stats['repositories']))
+         stats['repo_count'] = len(stats['repositories'])
+         stats['total_contributions'] = stats['total_commits'] + stats['total_prs_created'] + stats['total_issues_created']
+         
+         # Convert datetime objects to strings for JSON serialization
+         if stats['first_activity']:
+            stats['first_activity'] = stats['first_activity'].isoformat()
+         if stats['last_activity']:
+            stats['last_activity'] = stats['last_activity'].isoformat()
+      
+      return {
+         'period_start': start_date.isoformat(),
+         'period_end': end_date.isoformat(),
+         'total_developers': len(developer_stats),
+         'developers': developer_stats,
+      }
+
+   def _get_commits_since(self, org: str, repo: str, since: str) -> List[Dict]:
+      """Get commits since a specific date."""
+      commits = []
+      page = 1
+      per_page = 100
+      
+      while True:
+         result = self._gh_api(
+            f'/repos/{org}/{repo}/commits?since={since}&per_page={per_page}&page={page}'
+         )
+         if not result:
+            break
+         commits.extend(result)
+         if len(result) < per_page:
+            break
+         page += 1
+         if page > 10:  # Limit to 1000 commits per repo
+            break
+      
+      return commits
+
+   def _get_pull_requests_detailed(self, org: str, repo: str, since: str) -> List[Dict]:
+      """Get pull requests since a specific date with detailed stats."""
+      prs = []
+      page = 1
+      per_page = 100
+      
+      while True:
+         result = self._gh_api(
+            f'/repos/{org}/{repo}/pulls?state=all&per_page={per_page}&page={page}&sort=updated'
+         )
+         if not result:
+            break
+         
+         # Filter by date and get detailed info
+         for pr in result:
+            if pr.get('updated_at', '') >= since:
+               # Get detailed PR info including additions/deletions
+               pr_detail = self._gh_api(f"/repos/{org}/{repo}/pulls/{pr.get('number')}")
+               if pr_detail:
+                  prs.append(pr_detail)
+            else:
+               # PRs are sorted by updated_at, so we can stop
+               return prs
+         
+         if len(result) < per_page:
+            break
+         page += 1
+         if page > 10:  # Limit to 1000 PRs per repo
+            break
+      
+      return prs
+
+   def _get_issues_detailed(self, org: str, repo: str, since: str) -> List[Dict]:
+      """Get issues since a specific date."""
+      issues = []
+      page = 1
+      per_page = 100
+      
+      while True:
+         result = self._gh_api(
+            f'/repos/{org}/{repo}/issues?state=all&per_page={per_page}&page={page}&since={since}'
+         )
+         if not result:
+            break
+         
+         # Filter out PRs (issues API returns both)
+         for item in result:
+            if 'pull_request' not in item:  # It's an issue, not a PR
+               issues.append(item)
+         
+         if len(result) < per_page:
+            break
+         page += 1
+         if page > 10:  # Limit to 1000 issues per repo
+            break
+      
+      return issues
 
    def _categorize_activity(self, repos: List[Dict]) -> List[Dict]:
       """Categorize repositories by activity level."""

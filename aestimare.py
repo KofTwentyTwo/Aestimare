@@ -113,6 +113,7 @@ def analyze_data(config: Dict, aws_data: Dict, github_data: Dict, logger: loggin
       'infrastructure': {},
       'cost': {},
       'repositories': [],
+      'developer_activity': {},
       'executive_summary': {}
    }
 
@@ -152,6 +153,15 @@ def analyze_data(config: Dict, aws_data: Dict, github_data: Dict, logger: loggin
       logger.error(f"Repository analysis failed: {e}")
       results['repositories'] = []
 
+   # Developer Activity Analysis
+   logger.info("Analyzing developer activity...")
+   try:
+      results['developer_activity'] = analyzer.analyze_developer_activity(github_data)
+      save_analysis('developer_activity.json', results['developer_activity'], config)
+   except Exception as e:
+      logger.error(f"Developer activity analysis failed: {e}")
+      results['developer_activity'] = {'error': str(e)}
+
    # Executive Summary
    logger.info("Generating executive summary...")
    try:
@@ -184,6 +194,7 @@ def generate_reports(config: Dict, analysis: Dict, aws_data: Dict, github_data: 
       infrastructure=analysis.get('infrastructure', {}),
       cost=analysis.get('cost', {}),
       repos=analysis.get('repositories', []),
+      developer_activity=analysis.get('developer_activity', {}),
       aws_data=aws_data,
       github_data=github_data
    )
@@ -243,6 +254,7 @@ def load_existing_analysis(config: Dict) -> Dict:
       'infrastructure': 'infrastructure_analysis.json',
       'cost': 'cost_analysis.json',
       'repositories': 'repository_analysis.json',
+      'developer_activity': 'developer_activity.json',
       'executive_summary': 'executive_summary.json'
    }
 

@@ -27,7 +27,7 @@ class ReportGenerator:
 
    def generate_all_reports(self, executive_summary: Dict, security: Dict,
                         infrastructure: Dict, cost: Dict, repos: List[Dict],
-                        aws_data: Dict, github_data: Dict):
+                        developer_activity: Dict, aws_data: Dict, github_data: Dict):
       """Generate all reports from assessment data."""
       logger.info(f"Generating reports to: {self.output_dir}")
 
@@ -41,6 +41,7 @@ class ReportGenerator:
       self.generate_infrastructure_report(infrastructure, aws_data)
       self.generate_cost_report(cost)
       self.generate_repository_reports(repos)
+      self.generate_developer_activity_reports(developer_activity)
       self.generate_appendices(aws_data, github_data)
 
       logger.info("Report generation complete")
@@ -57,6 +58,8 @@ class ReportGenerator:
          'Code-Repositories/Product-Lines',
          'Cost-Analysis',
          'Product-Lines',
+         'Developer-Activity/Developers',
+         'Developer-Activity/Summaries',
          'Appendices',
       ]
 
@@ -1119,6 +1122,213 @@ This report was generated using Aestimare.
 """
 
       self._write_file('Appendices/Data-Reference.md', md)
+
+   def generate_developer_activity_reports(self, developer_activity: Dict):
+      """Generate developer activity reports."""
+      if not developer_activity or 'error' in developer_activity or not developer_activity.get('developers'):
+         logger.warning("No developer activity data available - skipping developer reports")
+         return
+      
+      # Generate summary report
+      self._generate_developer_summary(developer_activity)
+      
+      # Generate individual developer reports
+      developers = developer_activity.get('developers', {})
+      for login, dev_data in developers.items():
+         self._generate_developer_individual(login, dev_data, developer_activity)
+
+   def _generate_developer_summary(self, activity: Dict):
+      """Generate developer activity summary report."""
+      rankings = activity.get('rankings', {})
+      summary = activity.get('summary', {})
+      
+      md = f"""# Developer Activity Summary
+
+**Assessment Period:** {activity.get('period_start', 'N/A')} to {activity.get('period_end', 'N/A')}
+**Total Developers:** {activity.get('total_developers', 0)}
+
+---
+
+## Top Performers
+
+### Most Commits
+"""
+      
+      if rankings.get('by_commits'):
+         top_commits = rankings['by_commits'][:10]
+         md += "| Rank | Developer | Commits | Repositories | Lines Added |\n"
+         md += "|------|-----------|---------|--------------|-------------|\n"
+         for i, dev in enumerate(top_commits, 1):
+            md += f"| {i} | [[Developers/{dev['login']}\\|{dev['login']}]] | {dev['total_commits']} | {dev['repo_count']} | {dev['lines_added']:,} |\n"
+      
+      md += "\n### Most Pull Requests\n\n"
+      if rankings.get('by_prs'):
+         top_prs = rankings['by_prs'][:10]
+         md += "| Rank | Developer | PRs Created | PRs Merged | Merge Rate |\n"
+         md += "|------|-----------|-------------|------------|------------|\n"
+         for i, dev in enumerate(top_prs, 1):
+            merge_rate = (dev['total_prs_merged'] / dev['total_prs_created'] * 100) if dev['total_prs_created'] > 0 else 0
+            md += f"| {i} | [[Developers/{dev['login']}\\|{dev['login']}]] | {dev['total_prs_created']} | {dev['total_prs_merged']} | {merge_rate:.1f}% |\n"
+      
+      md += "\n### Most Contributions (Commits + PRs + Issues)\n\n"
+      if rankings.get('by_contributions'):
+         top_contrib = rankings['by_contributions'][:10]
+         md += "| Rank | Developer | Total Contributions | Commits | PRs | Issues |\n"
+         md += "|------|-----------|---------------------|---------|-----|--------|\n"
+         for i, dev in enumerate(top_contrib, 1):
+            md += f"| {i} | [[Developers/{dev['login']}\\|{dev['login']}]] | {dev['total_contributions']} | {dev['total_commits']} | {dev['total_prs_created']} | {dev['total_issues_created']} |\n"
+      
+      md += "\n### Most Lines of Code Added\n\n"
+      if rankings.get('by_lines_added'):
+         top_lines = rankings['by_lines_added'][:10]
+         md += "| Rank | Developer | Lines Added | Lines Deleted | Net Lines |\n"
+         md += "|------|-----------|-------------|---------------|-----------|\n"
+         for i, dev in enumerate(top_lines, 1):
+            md += f"| {i} | [[Developers/{dev['login']}\\|{dev['login']}]] | {dev['lines_added']:,} | {dev['lines_deleted']:,} | {dev['net_lines']:,} |\n"
+      
+      md += "\n### Most Active Across Repositories\n\n"
+      if rankings.get('by_repositories'):
+         top_repos = rankings['by_repositories'][:10]
+         md += "| Rank | Developer | Repositories | Organizations |\n"
+         md += "|------|-----------|--------------|---------------|\n"
+         for i, dev in enumerate(top_repos, 1):
+            md += f"| {i} | [[Developers/{dev['login']}\\|{dev['login']}]] | {dev['repo_count']} | {dev['org_count']} |\n"
+      
+      md += "\n---\n\n## Activity Statistics\n\n"
+      
+      developers_list = list(activity.get('developers', {}).values())
+      if developers_list:
+         total_commits = sum(d['total_commits'] for d in developers_list)
+         total_prs = sum(d['total_prs_created'] for d in developers_list)
+         total_issues = sum(d['total_issues_created'] for d in developers_list)
+         total_lines = sum(d['lines_added'] for d in developers_list)
+         avg_commits = total_commits / len(developers_list) if developers_list else 0
+         avg_prs = total_prs / len(developers_list) if developers_list else 0
+         
+         md += f"| Metric | Total | Average per Developer |\n"
+         md += f"|--------|-------|----------------------|\n"
+         md += f"| Commits | {total_commits:,} | {avg_commits:.1f} |\n"
+         md += f"| Pull Requests | {total_prs:,} | {avg_prs:.1f} |\n"
+         md += f"| Issues | {total_issues:,} | {total_issues / len(developers_list):.1f} |\n"
+         md += f"| Lines Added | {total_lines:,} | {total_lines / len(developers_list):,.0f} |\n"
+      
+      md += "\n---\n\n## Related Documents\n\n"
+      md += "- [[Developers/|Individual Developer Reports]]\n"
+      
+      self._write_file('Developer-Activity/Summary.md', md)
+
+   def _generate_developer_individual(self, login: str, dev_data: Dict, activity: Dict):
+      """Generate individual developer activity report."""
+      md = f"""# Developer Activity: {login}
+
+**Name:** {dev_data.get('name', 'N/A')}
+**Email:** {dev_data.get('email', 'N/A')}
+**Assessment Period:** {activity.get('period_start', 'N/A')} to {activity.get('period_end', 'N/A')}
+
+---
+
+## Overview
+
+| Metric | Value |
+|--------|-------|
+| **Total Contributions** | **{dev_data.get('total_contributions', 0)}** |
+| Commits | {dev_data.get('total_commits', 0)} |
+| Pull Requests Created | {dev_data.get('total_prs_created', 0)} |
+| Pull Requests Merged | {dev_data.get('total_prs_merged', 0)} |
+| Issues Created | {dev_data.get('total_issues_created', 0)} |
+| Issues Closed | {dev_data.get('total_issues_closed', 0)} |
+| Lines Added | {dev_data.get('lines_added', 0):,} |
+| Lines Deleted | {dev_data.get('lines_deleted', 0):,} |
+| Net Lines | {dev_data.get('net_lines', 0):,} |
+| Repositories | {dev_data.get('repo_count', 0)} |
+| Organizations | {dev_data.get('org_count', 0)} |
+| First Activity | {dev_data.get('first_activity', 'N/A')} |
+| Last Activity | {dev_data.get('last_activity', 'N/A')} |
+
+---
+
+## Repositories Worked On
+
+"""
+      
+      repos = dev_data.get('repositories', [])
+      if repos:
+         md += f"**Total:** {len(repos)} repositories\n\n"
+         for repo in sorted(repos):
+            md += f"- {repo}\n"
+      else:
+         md += "No repositories found.\n"
+      
+      md += "\n---\n\n## Organizations\n\n"
+      orgs = dev_data.get('organizations', [])
+      for org in sorted(orgs):
+         md += f"- {org}\n"
+      
+      # Recent commits
+      commits = dev_data.get('commits', [])
+      if commits:
+         md += "\n---\n\n## Recent Commits (Last 20)\n\n"
+         md += "| Repository | SHA | Message | Date |\n"
+         md += "|------------|-----|---------|------|\n"
+         for commit in sorted(commits, key=lambda x: x.get('date', ''), reverse=True)[:20]:
+            md += f"| {commit.get('repo', 'N/A')} | [{commit.get('sha', '')[:7]}]({commit.get('url', '')}) | {commit.get('message', '')[:60]}... | {commit.get('date', '')[:10]} |\n"
+      
+      # Pull requests
+      prs = dev_data.get('pull_requests', [])
+      if prs:
+         md += "\n---\n\n## Pull Requests\n\n"
+         md += f"**Total:** {len(prs)} pull requests\n\n"
+         md += "| Repository | # | Title | State | Merged | Additions | Deletions |\n"
+         md += "|------------|---|-------|-------|--------|-----------|-----------|\n"
+         for pr in sorted(prs, key=lambda x: x.get('created_at', ''), reverse=True)[:30]:
+            merged = '✅' if pr.get('merged') else '❌'
+            md += f"| {pr.get('repo', 'N/A')} | [{pr.get('number')}]({pr.get('url', '')}) | {pr.get('title', '')[:40]}... | {pr.get('state', 'N/A')} | {merged} | {pr.get('additions', 0):,} | {pr.get('deletions', 0):,} |\n"
+      
+      # Issues
+      issues = dev_data.get('issues', [])
+      if issues:
+         md += "\n---\n\n## Issues\n\n"
+         md += f"**Total:** {len(issues)} issues\n\n"
+         md += "| Repository | # | Title | State | Created |\n"
+         md += "|------------|---|-------|-------|---------|\n"
+         for issue in sorted(issues, key=lambda x: x.get('created_at', ''), reverse=True)[:20]:
+            md += f"| {issue.get('repo', 'N/A')} | [{issue.get('number')}]({issue.get('url', '')}) | {issue.get('title', '')[:50]}... | {issue.get('state', 'N/A')} | {issue.get('created_at', '')[:10]} |\n"
+      
+      # Activity breakdown by repository
+      md += "\n---\n\n## Activity by Repository\n\n"
+      repo_activity = {}
+      for commit in commits:
+         repo = commit.get('repo')
+         if repo:
+            if repo not in repo_activity:
+               repo_activity[repo] = {'commits': 0, 'prs': 0, 'issues': 0}
+            repo_activity[repo]['commits'] += 1
+      
+      for pr in prs:
+         repo = pr.get('repo')
+         if repo:
+            if repo not in repo_activity:
+               repo_activity[repo] = {'commits': 0, 'prs': 0, 'issues': 0}
+            repo_activity[repo]['prs'] += 1
+      
+      for issue in issues:
+         repo = issue.get('repo')
+         if repo:
+            if repo not in repo_activity:
+               repo_activity[repo] = {'commits': 0, 'prs': 0, 'issues': 0}
+            repo_activity[repo]['issues'] += 1
+      
+      if repo_activity:
+         md += "| Repository | Commits | PRs | Issues | Total |\n"
+         md += "|------------|---------|-----|--------|-------|\n"
+         for repo, stats in sorted(repo_activity.items(), key=lambda x: sum(x[1].values()), reverse=True):
+            total = stats['commits'] + stats['prs'] + stats['issues']
+            md += f"| {repo} | {stats['commits']} | {stats['prs']} | {stats['issues']} | {total} |\n"
+      
+      md += "\n---\n\n## Related Documents\n\n"
+      md += "- [[../Summary|Developer Activity Summary]]\n"
+      
+      self._write_file(f'Developer-Activity/Developers/{login}.md', md)
 
    def _write_file(self, relative_path: str, content: str):
       """Write content to a file."""

@@ -6,6 +6,7 @@ Supports multiple LLM providers (Anthropic, OpenAI).
 
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 import logging
@@ -245,6 +246,123 @@ class LLMAnalyzer:
                })
 
       return results
+
+   def analyze_developer_activity(self, github_data: Dict) -> Dict:
+      """Analyze developer activity across all repositories."""
+      logger.info("Analyzing developer activity...")
+      
+      all_developers = {}
+      org_summaries = {}
+      
+      for org_name, org_data in github_data.items():
+         dev_activity = org_data.get('developer_activity', {})
+         if not dev_activity:
+            continue
+         
+         developers = dev_activity.get('developers', {})
+         org_summaries[org_name] = {
+            'total_developers': len(developers),
+            'period_start': dev_activity.get('period_start'),
+            'period_end': dev_activity.get('period_end'),
+         }
+         
+         # Merge developers across organizations
+         for login, stats in developers.items():
+            if login not in all_developers:
+               all_developers[login] = {
+                  'login': login,
+                  'name': stats.get('name', ''),
+                  'email': stats.get('email', ''),
+                  'organizations': set(),
+                  'repositories': set(),
+                  'total_commits': 0,
+                  'total_prs_created': 0,
+                  'total_prs_merged': 0,
+                  'total_issues_created': 0,
+                  'total_issues_closed': 0,
+                  'lines_added': 0,
+                  'lines_deleted': 0,
+                  'commits': [],
+                  'pull_requests': [],
+                  'issues': [],
+                  'first_activity': None,
+                  'last_activity': None,
+               }
+            
+            all_developers[login]['organizations'].add(org_name)
+            all_developers[login]['repositories'].update(stats.get('repositories', []))
+            all_developers[login]['total_commits'] += stats.get('total_commits', 0)
+            all_developers[login]['total_prs_created'] += stats.get('total_prs_created', 0)
+            all_developers[login]['total_prs_merged'] += stats.get('total_prs_merged', 0)
+            all_developers[login]['total_issues_created'] += stats.get('total_issues_created', 0)
+            all_developers[login]['total_issues_closed'] += stats.get('total_issues_closed', 0)
+            all_developers[login]['lines_added'] += stats.get('lines_added', 0)
+            all_developers[login]['lines_deleted'] += stats.get('lines_deleted', 0)
+            all_developers[login]['commits'].extend(stats.get('commits', []))
+            all_developers[login]['pull_requests'].extend(stats.get('pull_requests', []))
+            all_developers[login]['issues'].extend(stats.get('issues', []))
+            
+            # Update activity dates
+            first = stats.get('first_activity')
+            last = stats.get('last_activity')
+            if first:
+               try:
+                  first_dt = datetime.fromisoformat(first.replace('Z', '+00:00'))
+                  if not all_developers[login]['first_activity'] or first_dt < all_developers[login]['first_activity']:
+                     all_developers[login]['first_activity'] = first_dt
+               except:
+                  pass
+            if last:
+               try:
+                  last_dt = datetime.fromisoformat(last.replace('Z', '+00:00'))
+                  if not all_developers[login]['last_activity'] or last_dt > all_developers[login]['last_activity']:
+                     all_developers[login]['last_activity'] = last_dt
+               except:
+                  pass
+      
+      # Convert sets to lists and calculate final stats
+      for login, dev in all_developers.items():
+         dev['organizations'] = sorted(list(dev['organizations']))
+         dev['repositories'] = sorted(list(dev['repositories']))
+         dev['repo_count'] = len(dev['repositories'])
+         dev['org_count'] = len(dev['organizations'])
+         dev['total_contributions'] = dev['total_commits'] + dev['total_prs_created'] + dev['total_issues_created']
+         dev['net_lines'] = dev['lines_added'] - dev['lines_deleted']
+         
+         # Convert datetime to string
+         if dev['first_activity']:
+            dev['first_activity'] = dev['first_activity'].isoformat()
+         if dev['last_activity']:
+            dev['last_activity'] = dev['last_activity'].isoformat()
+      
+      # Calculate rankings
+      developers_list = list(all_developers.values())
+      
+      rankings = {
+         'by_commits': sorted(developers_list, key=lambda x: x['total_commits'], reverse=True),
+         'by_prs': sorted(developers_list, key=lambda x: x['total_prs_created'], reverse=True),
+         'by_merged_prs': sorted(developers_list, key=lambda x: x['total_prs_merged'], reverse=True),
+         'by_contributions': sorted(developers_list, key=lambda x: x['total_contributions'], reverse=True),
+         'by_lines_added': sorted(developers_list, key=lambda x: x['lines_added'], reverse=True),
+         'by_repositories': sorted(developers_list, key=lambda x: x['repo_count'], reverse=True),
+      }
+      
+      return {
+         'period_start': dev_activity.get('period_start') if github_data else None,
+         'period_end': dev_activity.get('period_end') if github_data else None,
+         'total_developers': len(all_developers),
+         'organizations': org_summaries,
+         'developers': all_developers,
+         'rankings': rankings,
+         'summary': {
+            'most_commits': rankings['by_commits'][0] if rankings['by_commits'] else None,
+            'most_prs': rankings['by_prs'][0] if rankings['by_prs'] else None,
+            'most_contributions': rankings['by_contributions'][0] if rankings['by_contributions'] else None,
+            'most_repositories': rankings['by_repositories'][0] if rankings['by_repositories'] else None,
+            'least_commits': rankings['by_commits'][-1] if rankings['by_commits'] else None,
+            'least_prs': rankings['by_prs'][-1] if rankings['by_prs'] else None,
+         }
+      }
 
    def generate_executive_summary(self, security: Dict, infrastructure: Dict, cost: Dict, repos: List[Dict]) -> Dict:
       """Generate executive summary from all assessments."""
