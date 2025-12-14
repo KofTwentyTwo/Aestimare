@@ -133,18 +133,24 @@ Each report includes:
    cd aestimare
    ```
 
-2. **Install dependencies**
+2. **Set up virtual environment (recommended)**
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+3. **Install dependencies**
    ```bash
    pip install -r requirements.txt
    ```
 
-3. **Configure AWS profiles**
+4. **Configure AWS profiles**
    ```bash
    aws configure --profile prod-readonly
    aws configure --profile dev-readonly
    ```
 
-4. **Set up credentials**
+5. **Set up credentials**
    ```bash
    # GitHub token
    export GITHUB_TOKEN=ghp_xxxxxxxxxxxx
@@ -155,7 +161,7 @@ Each report includes:
    export OPENAI_API_KEY=sk-xxxxxxxxxxxx
    ```
 
-5. **Create configuration file**
+6. **Create configuration file**
    ```bash
    cp config/accounts.example.yaml config/accounts.yaml
    # Edit config/accounts.yaml with your AWS accounts and GitHub orgs
