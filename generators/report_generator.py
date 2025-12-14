@@ -647,8 +647,8 @@ class ReportGenerator:
 
 ## Repository Scores
 
-| # | Repository | Overall | Completeness | Security | Best Practices | Coding Standards | Activity |
-|---|------------|---------|--------------|----------|----------------|------------------|----------|
+| # | Repository | Overall | Security | Code Quality | Architecture | Performance | DevOps | Activity |
+|---|------------|---------|----------|--------------|--------------|-------------|--------|----------|
 """
 
       # Sort by score
@@ -659,10 +659,11 @@ class ReportGenerator:
          name = summary.get('repository_name', repo.get('name', 'Unknown'))
          md += f"| {i} | [[Repos/{name}\\|{name}]] | "
          md += f"{summary.get('overall_score', 'N/A')} | "
-         md += f"{summary.get('completeness_score', 'N/A')} | "
          md += f"{summary.get('security_score', 'N/A')} | "
-         md += f"{summary.get('best_practices_score', 'N/A')} | "
-         md += f"{summary.get('coding_standards_score', 'N/A')} | "
+         md += f"{summary.get('code_quality_score', 'N/A')} | "
+         md += f"{summary.get('architecture_score', 'N/A')} | "
+         md += f"{summary.get('performance_score', 'N/A')} | "
+         md += f"{summary.get('devops_score', 'N/A')} | "
          md += f"{summary.get('activity_level', 'N/A')} |\n"
 
       md += """
@@ -693,7 +694,7 @@ class ReportGenerator:
       self._write_file('Code-Repositories/Overall-Assessment.md', md)
 
    def _generate_repo_individual(self, repo: Dict):
-      """Generate individual repository report."""
+      """Generate individual repository report with comprehensive assessments."""
       summary = repo.get('summary', {})
       metrics = repo.get('metrics', {})
       name = summary.get('repository_name', repo.get('name', 'Unknown'))
@@ -711,9 +712,15 @@ class ReportGenerator:
 
 | Category | Score |
 |----------|-------|
-| Overall | {summary.get('overall_score', 'N/A')}/100 |
+| **Overall** | **{summary.get('overall_score', 'N/A')}/100** |
 | Completeness | {summary.get('completeness_score', 'N/A')}/100 |
 | Security | {summary.get('security_score', 'N/A')}/100 |
+| Code Quality | {summary.get('code_quality_score', 'N/A')}/100 |
+| Architecture | {summary.get('architecture_score', 'N/A')}/100 |
+| Performance | {summary.get('performance_score', 'N/A')}/100 |
+| Maintainability | {summary.get('maintainability_score', 'N/A')}/100 |
+| DevOps | {summary.get('devops_score', 'N/A')}/100 |
+| Compliance | {summary.get('compliance_score', 'N/A')}/100 |
 | Best Practices | {summary.get('best_practices_score', 'N/A')}/100 |
 | Coding Standards | {summary.get('coding_standards_score', 'N/A')}/100 |
 
@@ -732,68 +739,343 @@ class ReportGenerator:
 
 ---
 
-## Findings
+## Critical Findings
 
 """
 
-      for finding in repo.get('findings', []):
-         severity = finding.get('severity', 'INFO')
-         md += f"### [{severity}] {finding.get('title')}\n\n"
-         md += f"**Category:** {finding.get('category')}\n\n"
-         md += f"{finding.get('description')}\n\n"
-         md += f"**Recommendation:** {finding.get('recommendation')}\n\n"
-         md += "---\n\n"
+      # Group findings by severity
+      critical_findings = [f for f in repo.get('findings', []) if f.get('severity') == 'CRITICAL']
+      high_findings = [f for f in repo.get('findings', []) if f.get('severity') == 'HIGH']
+      
+      if critical_findings:
+         md += "### CRITICAL Issues\n\n"
+         for finding in critical_findings:
+            md += f"**{finding.get('title')}** [{finding.get('category')}]\n\n"
+            md += f"{finding.get('description')}\n\n"
+            md += f"*Recommendation:* {finding.get('recommendation')}\n\n"
+            md += "---\n\n"
+      
+      if high_findings:
+         md += "### HIGH Priority Issues\n\n"
+         for finding in high_findings[:5]:  # Limit to top 5
+            md += f"**{finding.get('title')}** [{finding.get('category')}]\n\n"
+            md += f"{finding.get('description')}\n\n"
+            md += f"*Recommendation:* {finding.get('recommendation')}\n\n"
+            md += "---\n\n"
 
-      md += """
-## Documentation
+      # Code Quality Assessment
+      code_quality = repo.get('code_quality_assessment', {})
+      if code_quality:
+         md += "## Code Quality Assessment\n\n"
+         complexity = code_quality.get('complexity_indicators', {})
+         tech_debt = code_quality.get('technical_debt', {})
+         
+         md += f"**Complexity:** {complexity.get('complexity_rating', 'unknown').upper()}\n"
+         md += f"- Large files: {complexity.get('large_files_count', 0)}\n"
+         md += f"- High complexity: {'Yes' if complexity.get('high_complexity') else 'No'}\n\n"
+         
+         md += f"**Technical Debt:** {tech_debt.get('debt_level', 'unknown').upper()}\n"
+         md += f"- TODO comments: {tech_debt.get('todo_count', 0)}\n"
+         md += f"- FIXME comments: {tech_debt.get('fixme_count', 0)}\n"
+         md += f"- HACK comments: {tech_debt.get('hack_count', 0)}\n"
+         md += f"- Deprecated code: {tech_debt.get('deprecated_count', 0)}\n\n"
+         
+         if code_quality.get('recommendations'):
+            md += "**Recommendations:**\n"
+            for rec in code_quality.get('recommendations', [])[:3]:
+               md += f"- {rec}\n"
+         md += "\n---\n\n"
 
-"""
+      # Security Deep Dive
+      security = repo.get('security_assessment', {})
+      if security:
+         md += "## Security Assessment\n\n"
+         md += f"- .gitignore: {'✅' if security.get('gitignore_present') else '❌'}\n"
+         md += f"- .env.example: {'✅' if security.get('env_example_present') else '❌'}\n"
+         md += f"- Dependency Lock: {'✅' if security.get('dependency_lock_present') else '❌'}\n"
+         md += f"- Security Policy: {'✅' if security.get('security_policy_present') else '❌'}\n"
+         md += f"- Dependabot: {'✅ Enabled' if security.get('dependabot_enabled') else '❌ Not Enabled'}\n"
+         md += f"- Branch Protection: {'✅' if security.get('branch_protection') else '❌'}\n"
+         md += f"- Vulnerabilities: {security.get('vulnerabilities_count', 0)}\n"
+         md += f"- Potential Secrets: {security.get('potential_secrets_count', 0)}\n\n"
+         
+         insecure = security.get('insecure_patterns', {})
+         if insecure.get('sql_injection_risk') or insecure.get('xss_risk') or insecure.get('eval_usage'):
+            md += "**⚠️ Security Risks Detected:**\n"
+            if insecure.get('sql_injection_risk'):
+               md += "- SQL Injection risk\n"
+            if insecure.get('xss_risk'):
+               md += "- XSS risk\n"
+            if insecure.get('eval_usage'):
+               md += "- eval() usage detected\n"
+            if insecure.get('dangerous_functions'):
+               md += f"- Dangerous functions: {', '.join([f['function'] for f in insecure.get('dangerous_functions', [])[:5]])}\n"
+         md += "\n---\n\n"
 
-      doc = repo.get('documentation_assessment', {})
-      md += f"- README: {doc.get('readme_quality', 'N/A')}\n"
-      md += f"- API Documentation: {'Yes' if doc.get('api_docs') else 'No'}\n"
-      md += f"- Contributing Guide: {'Yes' if doc.get('contributing_guide') else 'No'}\n"
-      md += f"- Changelog: {'Yes' if doc.get('changelog') else 'No'}\n"
-      md += f"- License: {doc.get('license', 'Missing')}\n"
+      # Performance Assessment
+      performance = repo.get('performance_assessment', {})
+      if performance:
+         md += "## Performance Assessment\n\n"
+         perf_tests = performance.get('performance_tests', {})
+         md += f"- Performance Tests: {'✅' if perf_tests.get('has_perf_tests') else '❌'}\n"
+         
+         monitoring = performance.get('monitoring_tools', {})
+         if monitoring.get('apm_tools'):
+            md += f"- APM Tools: {', '.join(monitoring.get('apm_tools', []))}\n"
+         else:
+            md += "- APM Tools: None detected\n"
+         
+         caching = performance.get('caching_indicators', {})
+         if caching.get('redis_usage') or caching.get('memcached_usage'):
+            md += f"- Caching: Redis={'✅' if caching.get('redis_usage') else '❌'}, Memcached={'✅' if caching.get('memcached_usage') else '❌'}\n"
+         
+         if performance.get('recommendations'):
+            md += "\n**Recommendations:**\n"
+            for rec in performance.get('recommendations', [])[:3]:
+               md += f"- {rec}\n"
+         md += "\n---\n\n"
 
-      md += """
-## Testing
+      # Architecture Assessment
+      architecture = repo.get('architecture_assessment', {})
+      if architecture:
+         md += "## Architecture Assessment\n\n"
+         structure = architecture.get('project_structure', {})
+         md += f"**Structure Quality:** {structure.get('structure_quality', 'unknown').upper()}\n"
+         md += f"- Common directories: {len(structure.get('common_directories', []))}\n\n"
+         
+         patterns = architecture.get('design_patterns', {})
+         detected_patterns = [k.upper() for k, v in patterns.items() if v]
+         if detected_patterns:
+            md += f"**Design Patterns:** {', '.join(detected_patterns)}\n\n"
+         
+         api = architecture.get('api_design', {})
+         md += f"**API Design:**\n"
+         md += f"- OpenAPI/Swagger: {'✅' if api.get('has_openapi') or api.get('has_swagger') else '❌'}\n"
+         md += f"- GraphQL: {'✅' if api.get('has_graphql') else '❌'}\n"
+         md += f"- Versioning: {'✅' if api.get('versioning') else '❌'}\n\n"
+         
+         if architecture.get('recommendations'):
+            md += "**Recommendations:**\n"
+            for rec in architecture.get('recommendations', [])[:3]:
+               md += f"- {rec}\n"
+         md += "\n---\n\n"
 
-"""
+      # Maintainability Assessment
+      maintainability = repo.get('maintainability_assessment', {})
+      if maintainability:
+         md += "## Maintainability Assessment\n\n"
+         comments = maintainability.get('code_comments', {})
+         md += f"**Code Comments:** {comments.get('comment_quality', 'unknown').upper()}\n"
+         md += f"- Comment ratio: {comments.get('comment_ratio', 0)}%\n"
+         md += f"- Docstring ratio: {comments.get('docstring_ratio', 0)}%\n\n"
+         
+         ownership = maintainability.get('code_ownership', {})
+         md += f"**Code Ownership:**\n"
+         md += f"- CODEOWNERS: {'✅' if ownership.get('codeowners_present') else '❌'}\n"
+         md += f"- Maintainers file: {'✅' if ownership.get('maintainers_file') else '❌'}\n\n"
+         
+         legacy = maintainability.get('legacy_indicators', {})
+         if legacy.get('deprecated_libraries'):
+            md += f"**Legacy Code:** {len(legacy.get('deprecated_libraries', []))} deprecated libraries detected\n\n"
+         
+         if maintainability.get('recommendations'):
+            md += "**Recommendations:**\n"
+            for rec in maintainability.get('recommendations', [])[:3]:
+               md += f"- {rec}\n"
+         md += "\n---\n\n"
 
+      # DevOps Assessment
+      devops = repo.get('devops_assessment', {})
+      if devops:
+         md += "## DevOps & Operations Assessment\n\n"
+         iac = devops.get('infrastructure_as_code', {})
+         iac_tools = [k.upper() for k, v in iac.items() if v]
+         if iac_tools:
+            md += f"**Infrastructure as Code:** {', '.join(iac_tools)}\n"
+         else:
+            md += "**Infrastructure as Code:** None detected\n"
+         
+         deployment = devops.get('deployment_config', {})
+         md += f"**Deployment:**\n"
+         md += f"- Dockerfile: {'✅' if deployment.get('dockerfile') else '❌'}\n"
+         md += f"- Kubernetes: {'✅' if deployment.get('kubernetes') else '❌'}\n"
+         md += f"- Helm: {'✅' if deployment.get('helm') else '❌'}\n\n"
+         
+         monitoring = devops.get('monitoring_logging', {})
+         md += f"**Monitoring:**\n"
+         md += f"- Structured logging: {'✅' if monitoring.get('structured_logging') else '❌'}\n"
+         md += f"- Health checks: {'✅' if devops.get('health_checks', {}).get('has_health_endpoint') else '❌'}\n\n"
+         
+         if devops.get('recommendations'):
+            md += "**Recommendations:**\n"
+            for rec in devops.get('recommendations', [])[:3]:
+               md += f"- {rec}\n"
+         md += "\n---\n\n"
+
+      # Compliance Assessment
+      compliance = repo.get('compliance_assessment', {})
+      if compliance:
+         md += "## Compliance Assessment\n\n"
+         licenses = compliance.get('licenses', {})
+         md += f"**Licenses:**\n"
+         md += f"- Main license: {licenses.get('main_license', 'Unknown')}\n"
+         md += f"- License file: {'✅' if licenses.get('license_file') else '❌'}\n"
+         md += f"- Compliance: {licenses.get('compliance_status', 'unknown')}\n\n"
+         
+         privacy = compliance.get('privacy_compliance', {})
+         md += f"**Privacy:**\n"
+         md += f"- Privacy policy: {'✅' if privacy.get('privacy_policy') else '❌'}\n"
+         md += f"- GDPR indicators: {'✅' if privacy.get('gdpr_indicators') else '❌'}\n\n"
+         
+         a11y = compliance.get('accessibility', {})
+         md += f"**Accessibility:**\n"
+         md += f"- A11y testing: {'✅' if a11y.get('a11y_testing') else '❌'}\n"
+         if a11y.get('a11y_libraries'):
+            md += f"- A11y libraries: {', '.join(a11y.get('a11y_libraries', []))}\n"
+         md += "\n---\n\n"
+
+      # Testing Assessment
       test = repo.get('testing_assessment', {})
-      md += f"- Has Tests: {'Yes' if test.get('has_tests') else 'No'}\n"
-      md += f"- Test Files: {test.get('test_files_count', 0)}\n"
-      md += f"- CI/CD: {', '.join(test.get('ci_cd_systems', [])) or 'None'}\n"
+      if test:
+         md += "## Testing Assessment\n\n"
+         md += f"- Has Tests: {'✅' if test.get('has_tests') else '❌'}\n"
+         
+         test_types = test.get('test_types', {})
+         md += f"**Test Types:**\n"
+         md += f"- Unit tests: {'✅' if test_types.get('unit_tests') else '❌'}\n"
+         md += f"- Integration tests: {'✅' if test_types.get('integration_tests') else '❌'}\n"
+         md += f"- E2E tests: {'✅' if test_types.get('e2e_tests') else '❌'}\n"
+         md += f"- Performance tests: {'✅' if test_types.get('performance_tests') else '❌'}\n\n"
+         
+         frameworks = test.get('test_frameworks', [])
+         if frameworks:
+            md += f"**Frameworks:** {', '.join(frameworks)}\n\n"
+         
+         md += f"- CI/CD: {', '.join(test.get('ci_cd_systems', [])) or 'None'}\n"
+         md += f"- Coverage tools: {'✅' if test.get('test_coverage_tools', {}).get('coverage_tools') else '❌'}\n\n"
+         
+         if test.get('recommendations'):
+            md += "**Recommendations:**\n"
+            for rec in test.get('recommendations', [])[:3]:
+               md += f"- {rec}\n"
+         md += "\n---\n\n"
 
-      md += """
-## Security
+      # Developer Experience
+      dev_ex = repo.get('developer_experience_assessment', {})
+      if dev_ex:
+         md += "## Developer Experience\n\n"
+         onboarding = dev_ex.get('onboarding', {})
+         md += f"**Onboarding:**\n"
+         md += f"- Getting started guide: {'✅' if onboarding.get('getting_started') else '❌'}\n"
+         md += f"- Setup instructions: {'✅' if onboarding.get('setup_instructions') else '❌'}\n\n"
+         
+         dev_env = dev_ex.get('dev_environment', {})
+         md += f"**Dev Environment:**\n"
+         md += f"- Docker dev: {'✅' if dev_env.get('docker_dev') else '❌'}\n"
+         md += f"- DevContainer: {'✅' if dev_env.get('devcontainer') else '❌'}\n"
+         md += f"- Setup scripts: {'✅' if dev_env.get('setup_scripts') else '❌'}\n\n"
+         
+         md += f"- Pre-commit hooks: {'✅' if dev_ex.get('pre_commit_hooks', {}).get('husky') or dev_ex.get('pre_commit_hooks', {}).get('pre_commit') else '❌'}\n"
+         md += "\n---\n\n"
 
-"""
+      # Code Review
+      code_review = repo.get('code_review_assessment', {})
+      if code_review:
+         md += "## Code Review Practices\n\n"
+         md += f"- PR template: {'✅' if code_review.get('pr_template') else '❌'}\n"
+         md += f"- Issue templates: {'✅' if code_review.get('issue_templates') else '❌'}\n"
+         md += f"- Review requirements: {'✅' if code_review.get('review_requirements', {}).get('review_docs') else '❌'}\n"
+         md += "\n---\n\n"
 
-      sec = repo.get('security_assessment', {})
-      md += f"- .gitignore: {'Yes' if sec.get('gitignore_present') else 'No'}\n"
-      md += f"- .env.example: {'Yes' if sec.get('env_example_present') else 'No'}\n"
-      md += f"- Dependency Lock: {'Yes' if sec.get('dependency_lock_present') else 'No'}\n"
-      md += f"- Security Policy: {'Yes' if sec.get('security_policy_present') else 'No'}\n"
-      md += f"- Dependabot: {'Enabled' if sec.get('dependabot_enabled') else 'Not Enabled'}\n"
-      md += f"- Branch Protection: {'Yes' if sec.get('branch_protection') else 'No'}\n"
+      # Error Handling
+      error_handling = repo.get('error_handling_assessment', {})
+      if error_handling:
+         md += "## Error Handling\n\n"
+         md += f"**Quality:** {error_handling.get('error_handling_quality', 'unknown').upper()}\n"
+         md += f"- Try-catch usage: {'✅' if error_handling.get('try_catch_usage') else '❌'}\n"
+         md += f"- Error boundaries: {'✅' if error_handling.get('error_boundaries') else '❌'}\n"
+         md += f"- Logging: {'✅' if error_handling.get('logging_present') else '❌'}\n"
+         if error_handling.get('recommendations'):
+            md += "\n**Recommendations:**\n"
+            for rec in error_handling.get('recommendations', [])[:3]:
+               md += f"- {rec}\n"
+         md += "\n---\n\n"
 
-      md += """
----
+      # Documentation
+      doc = repo.get('documentation_assessment', {})
+      if doc:
+         md += "## Documentation\n\n"
+         md += f"- README: {doc.get('readme_quality', 'N/A')}\n"
+         
+         api_docs = doc.get('api_docs', {})
+         if isinstance(api_docs, dict):
+            md += f"- API Documentation: OpenAPI={'✅' if api_docs.get('openapi') else '❌'}, Swagger={'✅' if api_docs.get('swagger') else '❌'}, GraphQL={'✅' if api_docs.get('graphql_schema') else '❌'}\n"
+         else:
+            md += f"- API Documentation: {'Yes' if api_docs else 'No'}\n"
+         
+         md += f"- Code examples: {'✅' if doc.get('code_examples', {}).get('examples_dir') or doc.get('code_examples', {}).get('usage_examples') else '❌'}\n"
+         md += f"- ADR: {'✅' if doc.get('adr_present') else '❌'}\n"
+         md += f"- Runbooks: {'✅' if doc.get('runbooks') else '❌'}\n"
+         md += f"- Contributing Guide: {'✅' if doc.get('contributing_guide') else '❌'}\n"
+         md += f"- Changelog: {'✅' if doc.get('changelog') else '❌'}\n"
+         md += f"- License: {doc.get('license', 'Missing')}\n"
+         md += "\n---\n\n"
 
-## Recommendations
+      # Dependencies
+      deps = repo.get('dependencies_assessment', {})
+      if deps:
+         md += "## Dependencies\n\n"
+         md += f"- Outdated: {deps.get('outdated_dependencies', 0)}\n"
+         md += f"- Security vulnerabilities: {deps.get('security_vulnerabilities', 0)}\n"
+         if deps.get('deprecated_packages'):
+            md += f"- Deprecated: {', '.join(deps.get('deprecated_packages', [])[:5])}\n"
+         md += "\n---\n\n"
 
-"""
+      # Coding Standards
+      coding_standards = repo.get('coding_standards_assessment', {})
+      if coding_standards:
+         md += "## Coding Standards\n\n"
+         md += f"- Linter: {'✅' if coding_standards.get('linter_configured') else '❌'}\n"
+         md += f"- Formatter: {'✅' if coding_standards.get('formatter_configured') else '❌'}\n"
+         md += f"- TypeScript: {'✅' if coding_standards.get('typescript_configured') else '❌'}\n"
+         md += f"- EditorConfig: {'✅' if coding_standards.get('editorconfig_present') else '❌'}\n"
+         md += "\n---\n\n"
 
-      for rec in repo.get('recommendations', {}).get('immediate', []):
-         md += f"1. **[Immediate]** {rec}\n"
+      # All Findings
+      all_findings = repo.get('findings', [])
+      if all_findings:
+         md += "## All Findings\n\n"
+         for finding in all_findings:
+            severity = finding.get('severity', 'INFO')
+            md += f"### [{severity}] {finding.get('title')}\n\n"
+            md += f"**Category:** {finding.get('category')}\n\n"
+            md += f"{finding.get('description')}\n\n"
+            md += f"**Impact:** {finding.get('impact', 'N/A')}\n\n"
+            md += f"**Recommendation:** {finding.get('recommendation')}\n\n"
+            md += f"**Effort:** {finding.get('effort', 'N/A')}\n\n"
+            md += "---\n\n"
 
-      for rec in repo.get('recommendations', {}).get('short_term', []):
-         md += f"2. **[Short-term]** {rec}\n"
-
-      for rec in repo.get('recommendations', {}).get('long_term', []):
-         md += f"3. **[Long-term]** {rec}\n"
+      # Recommendations
+      recommendations = repo.get('recommendations', {})
+      if recommendations:
+         md += "## Recommendations\n\n"
+         
+         if recommendations.get('immediate'):
+            md += "### Immediate (24-48 hours)\n\n"
+            for rec in recommendations.get('immediate', []):
+               md += f"1. {rec}\n"
+            md += "\n"
+         
+         if recommendations.get('short_term'):
+            md += "### Short-term (1-4 weeks)\n\n"
+            for rec in recommendations.get('short_term', []):
+               md += f"1. {rec}\n"
+            md += "\n"
+         
+         if recommendations.get('long_term'):
+            md += "### Long-term (Strategic)\n\n"
+            for rec in recommendations.get('long_term', []):
+               md += f"1. {rec}\n"
 
       self._write_file(f'Code-Repositories/Repos/{name}.md', md)
 
