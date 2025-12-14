@@ -41,15 +41,27 @@ except ImportError:
 def setup_logging(verbose: bool = False):
    """Configure logging."""
    level = logging.DEBUG if verbose else logging.INFO
+
+   # Create logs directory if it doesn't exist
+   logs_dir = Path(__file__).parent / 'logs'
+   logs_dir.mkdir(exist_ok=True)
+
+   # Generate timestamped log filename
+   log_filename = logs_dir / f'aestimare_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
+
    logging.basicConfig(
       level=level,
       format='%(asctime)s - %(levelname)s - %(message)s',
       handlers=[
          logging.StreamHandler(),
-         logging.FileHandler(f'aestimare_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log')
+         logging.FileHandler(log_filename)
       ]
    )
-   return logging.getLogger(__name__)
+   
+   logger = logging.getLogger(__name__)
+   logger.info(f"Logging to: {log_filename}")
+   
+   return logger
 
 
 def load_config(config_path: str) -> Dict:

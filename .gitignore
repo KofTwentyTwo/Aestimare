@@ -45,6 +45,7 @@ config/*.yml.local
 *.log
 aestimare_*.log
 assessment_*.log
+logs/
 .data/
 reports/
 .repos-readonly/
