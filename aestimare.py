@@ -15,6 +15,7 @@ Options:
    --report-only      Only generate reports from existing analysis
    --no-aws           Skip AWS data collection
    --no-github        Skip GitHub data collection
+   --yes, -y          Skip confirmation prompt and proceed automatically
    --verbose          Enable verbose logging
 """
 
@@ -66,6 +67,103 @@ def load_config(config_path: str) -> Dict:
 
    with open(path, 'r') as f:
       return yaml.safe_load(f)
+
+
+def confirm_assessment_plan(config: Dict, args, logger: logging.Logger) -> bool:
+   """Display assessment plan and request user confirmation."""
+   print("\n" + "=" * 70)
+   print("ASSESSMENT PLAN")
+   print("=" * 70)
+   
+   # AWS Accounts
+   aws_accounts = config.get('aws_accounts', [])
+   enabled_aws = [a for a in aws_accounts if a.get('enabled', True) and not args.no_aws]
+   
+   if enabled_aws:
+      print("\n📊 AWS Accounts to Assess:")
+      print("-" * 70)
+      for account in enabled_aws:
+         account_id = account.get('account_id', 'N/A')
+         profile = account.get('profile', 'N/A')
+         regions = account.get('regions', [])
+         regions_str = ', '.join(regions) if regions else 'default'
+         print(f"  • {account.get('name', 'Unknown')}")
+         print(f"    Profile: {profile}")
+         print(f"    Account ID: {account_id}")
+         print(f"    Regions: {regions_str}")
+         if account.get('tags'):
+            tags = ', '.join([f"{k}={v}" for k, v in account.get('tags', {}).items()])
+            print(f"    Tags: {tags}")
+         print()
+   elif not args.no_aws:
+      print("\n⚠️  No enabled AWS accounts found in configuration")
+   else:
+      print("\n⏭️  AWS assessment skipped (--no-aws flag)")
+   
+   # GitHub Organizations
+   github_config = config.get('github', {})
+   github_orgs = github_config.get('organizations', [])
+   enabled_github = [o for o in github_orgs if o.get('enabled', True) and not args.no_github]
+   
+   if enabled_github:
+      print("\n🔷 GitHub Organizations to Assess:")
+      print("-" * 70)
+      for org in enabled_github:
+         org_name = org.get('name', 'Unknown')
+         include_archived = org.get('include_archived', False)
+         include_forks = org.get('include_forks', False)
+         print(f"  • {org_name}")
+         print(f"    Include Archived: {'Yes' if include_archived else 'No'}")
+         print(f"    Include Forks: {'Yes' if include_forks else 'No'}")
+         print()
+      
+      clone_repos = github_config.get('clone_repos', False)
+      if clone_repos:
+         clone_dir = github_config.get('clone_dir', '.repos-readonly')
+         print(f"    ⚠️  Local repository cloning: ENABLED")
+         print(f"       Clone directory: {clone_dir}")
+         print()
+   elif not args.no_github:
+      print("\n⚠️  No enabled GitHub organizations found in configuration")
+   else:
+      print("\n⏭️  GitHub assessment skipped (--no-github flag)")
+   
+   # Assessment metadata
+   assessment = config.get('assessment', {})
+   if assessment:
+      print("\n📋 Assessment Details:")
+      print("-" * 70)
+      print(f"  Name: {assessment.get('name', 'N/A')}")
+      print(f"  Organization: {assessment.get('organization', 'N/A')}")
+      print(f"  Output Directory: {assessment.get('output_dir', 'N/A')}")
+      print(f"  Data Directory: {assessment.get('data_dir', 'N/A')}")
+      print()
+   
+   # Summary
+   print("=" * 70)
+   print("SUMMARY:")
+   print(f"  • AWS Accounts: {len(enabled_aws)}")
+   print(f"  • GitHub Organizations: {len(enabled_github)}")
+   print("=" * 70)
+   
+   if args.yes:
+      print("\n✅ Auto-confirmed (--yes flag). Proceeding with assessment...\n")
+      return True
+   
+   # Request confirmation
+   print("\n⚠️  This will connect to the above accounts and organizations.")
+   print("    All operations are read-only and will not modify any resources.\n")
+   
+   while True:
+      response = input("Proceed with assessment? [yes/no]: ").strip().lower()
+      if response in ['yes', 'y']:
+         print("\n✅ Confirmed. Starting assessment...\n")
+         return True
+      elif response in ['no', 'n']:
+         print("\n❌ Assessment cancelled.\n")
+         return False
+      else:
+         print("Please enter 'yes' or 'no'")
 
 
 def collect_aws_data(config: Dict, logger: logging.Logger) -> Dict:
@@ -317,6 +415,12 @@ def main():
       help='Enable verbose logging'
    )
 
+   parser.add_argument(
+      '--yes', '-y',
+      action='store_true',
+      help='Skip confirmation prompt and proceed automatically'
+   )
+
    args = parser.parse_args()
 
    # Setup logging
@@ -335,6 +439,12 @@ def main():
    except Exception as e:
       logger.error(f"Failed to load config: {e}")
       sys.exit(1)
+
+   # Show assessment plan and request confirmation
+   if not args.analyze_only and not args.report_only:
+      if not confirm_assessment_plan(config, args, logger):
+         logger.info("Assessment cancelled by user")
+         sys.exit(0)
 
    # Initialize data
    aws_data = {}
