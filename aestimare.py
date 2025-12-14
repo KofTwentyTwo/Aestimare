@@ -32,7 +32,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 try:
    import yaml
 except ImportError:
-   print("ERROR: PyYAML not installed. Run: pip install pyyaml")
+   print("ERROR: PyYAML not installed. Run: pip install --user PyYAML")
    sys.exit(1)
 
 
