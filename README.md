@@ -161,7 +161,7 @@ Each report includes:
 
 6. **Run assessment**
    ```bash
-   python run_assessment.py
+   python aestimare.py
    ```
 
 ## Configuration
@@ -213,7 +213,7 @@ See `config/accounts.example.yaml` for complete configuration options.
 Run a complete assessment (collection, analysis, and reporting):
 
 ```bash
-python run_assessment.py
+python aestimare.py
 ```
 
 ### Phased Execution
@@ -222,13 +222,13 @@ Run individual phases separately:
 
 ```bash
 # Collect data only
-python run_assessment.py --collect-only
+python aestimare.py --collect-only
 
 # Analyze existing data
-python run_assessment.py --analyze-only
+python aestimare.py --analyze-only
 
 # Generate reports from existing analysis
-python run_assessment.py --report-only
+python aestimare.py --report-only
 ```
 
 ### Selective Collection
@@ -237,16 +237,16 @@ Skip specific data sources:
 
 ```bash
 # Skip AWS collection
-python run_assessment.py --no-aws
+python aestimare.py --no-aws
 
 # Skip GitHub collection
-python run_assessment.py --no-github
+python aestimare.py --no-github
 ```
 
 ### Custom Configuration
 
 ```bash
-python run_assessment.py --config /path/to/config.yaml
+python aestimare.py --config /path/to/config.yaml
 ```
 
 ## Architecture

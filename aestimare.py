@@ -6,7 +6,7 @@ This tool collects data from AWS accounts and GitHub repositories,
 analyzes the data using LLM, and generates comprehensive assessment reports.
 
 Usage:
-   python run_assessment.py [options]
+   python aestimare.py [options]
 
 Options:
    --config PATH      Path to config file (default: config/accounts.yaml)

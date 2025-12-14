@@ -41,7 +41,7 @@ We welcome feature suggestions! Please open an issue with:
 3. **Test your changes**
    ```bash
    # Run with test data
-   python run_assessment.py --config config/accounts.example.yaml
+   python aestimare.py --config config/accounts.example.yaml
    ```
 
 4. **Commit your changes**
@@ -129,7 +129,7 @@ aestimare/
 ├── config/             # Configuration files
 ├── generators/         # Report generation
 ├── prompts/            # LLM prompt templates
-├── run_assessment.py   # Main entry point
+├── aestimare.py        # Main entry point
 └── requirements.txt     # Dependencies
 ```
 
