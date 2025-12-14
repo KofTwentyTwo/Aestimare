@@ -22,10 +22,11 @@ Options:
 import argparse
 import json
 import logging
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
@@ -67,6 +68,165 @@ def load_config(config_path: str) -> Dict:
 
    with open(path, 'r') as f:
       return yaml.safe_load(f)
+
+
+def test_connectivity(config: Dict, args, logger: logging.Logger) -> List[Dict]:
+   """Test connectivity to all configured AWS accounts and GitHub organizations."""
+   results = []
+   
+   # Test AWS accounts
+   if not args.no_aws:
+      aws_accounts = config.get('aws_accounts', [])
+      enabled_aws = [a for a in aws_accounts if a.get('enabled', True)]
+      
+      for account in enabled_aws:
+         account_name = account.get('name', 'Unknown')
+         profile = account.get('profile', '')
+         account_id = account.get('account_id', 'N/A')
+         
+         print(f"Testing AWS connectivity: {account_name}...", end=' ', flush=True)
+         
+         try:
+            # Test AWS connectivity by calling sts get-caller-identity
+            import subprocess
+            cmd = ['aws', 'sts', 'get-caller-identity', '--profile', profile, '--output', 'json']
+            result = subprocess.run(
+               cmd,
+               capture_output=True,
+               text=True,
+               timeout=10
+            )
+            
+            if result.returncode == 0:
+               identity = json.loads(result.stdout)
+               actual_account_id = identity.get('Account', 'N/A')
+               user_arn = identity.get('Arn', 'N/A')
+               
+               # Verify account ID matches if provided
+               if account_id != 'N/A' and account_id != actual_account_id:
+                  print("❌")
+                  results.append({
+                     'name': f"AWS: {account_name}",
+                     'success': False,
+                     'error': f"Account ID mismatch. Expected {account_id}, got {actual_account_id}"
+                  })
+               else:
+                  print("✓")
+                  results.append({
+                     'name': f"AWS: {account_name}",
+                     'success': True,
+                     'details': f"Account ID: {actual_account_id}, User: {user_arn.split('/')[-1]}"
+                  })
+            else:
+               print("❌")
+               error_msg = result.stderr.strip() or result.stdout.strip() or "Unknown error"
+               results.append({
+                  'name': f"AWS: {account_name}",
+                  'success': False,
+                  'error': error_msg
+               })
+         except subprocess.TimeoutExpired:
+            print("❌")
+            results.append({
+               'name': f"AWS: {account_name}",
+               'success': False,
+               'error': "Connection timeout"
+            })
+         except FileNotFoundError:
+            print("❌")
+            results.append({
+               'name': f"AWS: {account_name}",
+               'success': False,
+               'error': "AWS CLI not found. Please install AWS CLI."
+            })
+         except json.JSONDecodeError:
+            print("❌")
+            results.append({
+               'name': f"AWS: {account_name}",
+               'success': False,
+               'error': "Invalid response from AWS CLI"
+            })
+         except Exception as e:
+            print("❌")
+            results.append({
+               'name': f"AWS: {account_name}",
+               'success': False,
+               'error': str(e)
+            })
+   
+   # Test GitHub organizations
+   if not args.no_github:
+      github_config = config.get('github', {})
+      github_orgs = github_config.get('organizations', [])
+      enabled_github = [o for o in github_orgs if o.get('enabled', True)]
+      token = github_config.get('token') or os.environ.get('GITHUB_TOKEN')
+      
+      if not token:
+         for org in enabled_github:
+            org_name = org.get('name', 'Unknown')
+            print(f"Testing GitHub connectivity: {org_name}...", end=' ', flush=True)
+            print("❌")
+            results.append({
+               'name': f"GitHub: {org_name}",
+               'success': False,
+               'error': "GitHub token not found. Set GITHUB_TOKEN environment variable or configure in config file."
+            })
+      else:
+         for org in enabled_github:
+            org_name = org.get('name', 'Unknown')
+            print(f"Testing GitHub connectivity: {org_name}...", end=' ', flush=True)
+            
+            try:
+               # Test GitHub connectivity using direct HTTP request (same as collector)
+               import urllib.request
+               import urllib.error
+               
+               url = f'https://api.github.com/orgs/{org_name}'
+               req = urllib.request.Request(url)
+               req.add_header('Authorization', f'token {token}')
+               req.add_header('Accept', 'application/vnd.github.v3+json')
+               req.add_header('User-Agent', 'Aestimare')
+               
+               with urllib.request.urlopen(req, timeout=10) as response:
+                  org_data = json.loads(response.read().decode())
+                  org_login = org_data.get('login', 'N/A')
+                  org_type = org_data.get('type', 'N/A')
+                  
+                  print("✓")
+                  results.append({
+                     'name': f"GitHub: {org_name}",
+                     'success': True,
+                     'details': f"Organization: {org_login} ({org_type})"
+                  })
+            except urllib.error.HTTPError as e:
+               print("❌")
+               error_body = e.read().decode() if e.fp else "Unknown error"
+               try:
+                  error_json = json.loads(error_body)
+                  error_msg = error_json.get('message', error_body)
+               except:
+                  error_msg = error_body or f"HTTP {e.code}: {e.reason}"
+               results.append({
+                  'name': f"GitHub: {org_name}",
+                  'success': False,
+                  'error': error_msg
+               })
+            except urllib.error.URLError as e:
+               print("❌")
+               results.append({
+                  'name': f"GitHub: {org_name}",
+                  'success': False,
+                  'error': f"Connection error: {str(e)}"
+               })
+            except Exception as e:
+               print("❌")
+               results.append({
+                  'name': f"GitHub: {org_name}",
+                  'success': False,
+                  'error': str(e)
+               })
+   
+   return results
 
 
 def confirm_assessment_plan(config: Dict, args, logger: logging.Logger) -> bool:
@@ -147,17 +307,72 @@ def confirm_assessment_plan(config: Dict, args, logger: logging.Logger) -> bool:
    print("=" * 70)
    
    if args.yes:
+      print("\n✅ Auto-confirmed (--yes flag). Testing connectivity...\n")
+   else:
+      # Request initial confirmation
+      print("\n⚠️  This will connect to the above accounts and organizations.")
+      print("    All operations are read-only and will not modify any resources.\n")
+      
+      while True:
+         response = input("Proceed with connectivity check? [yes/no]: ").strip().lower()
+         if response in ['yes', 'y']:
+            print("\n✅ Confirmed. Testing connectivity...\n")
+            break
+         elif response in ['no', 'n']:
+            print("\n❌ Assessment cancelled.\n")
+            return False
+         else:
+            print("Please enter 'yes' or 'no'")
+   
+   # Test connectivity to all configured environments
+   connectivity_results = test_connectivity(config, args, logger)
+   
+   # Check if any connectivity tests failed
+   failed_checks = []
+   for check in connectivity_results:
+      if not check.get('success', False):
+         failed_checks.append(check)
+   
+   if failed_checks:
+      print("\n" + "=" * 70)
+      print("❌ CONNECTIVITY CHECK FAILED")
+      print("=" * 70)
+      print("\nThe following connectivity checks failed:\n")
+      for check in failed_checks:
+         print(f"  ✗ {check.get('name', 'Unknown')}")
+         print(f"    Error: {check.get('error', 'Unknown error')}")
+         print()
+      print("Please fix the connectivity issues and try again.")
+      print("=" * 70 + "\n")
+      return False
+   
+   # All checks passed - show results and request final confirmation
+   print("\n" + "=" * 70)
+   print("✅ CONNECTIVITY CHECK PASSED")
+   print("=" * 70)
+   print("\nAll connectivity checks successful:\n")
+   for check in connectivity_results:
+      details = check.get('details', '')
+      print(f"  ✓ {check.get('name', 'Unknown')}")
+      if details:
+         print(f"    {details}")
+      print()
+   
+   print("=" * 70)
+   
+   if args.yes:
       print("\n✅ Auto-confirmed (--yes flag). Proceeding with assessment...\n")
       return True
    
-   # Request confirmation
-   print("\n⚠️  This will connect to the above accounts and organizations.")
-   print("    All operations are read-only and will not modify any resources.\n")
+   # Request final confirmation
+   print("\n⚠️  All connectivity checks passed. Ready to begin assessment.")
+   print("    This may take a significant amount of time depending on the")
+   print("    size of your infrastructure and repositories.\n")
    
    while True:
-      response = input("Proceed with assessment? [yes/no]: ").strip().lower()
+      response = input("Begin assessment now? [yes/no]: ").strip().lower()
       if response in ['yes', 'y']:
-         print("\n✅ Confirmed. Starting assessment...\n")
+         print("\n✅ Final confirmation received. Starting assessment...\n")
          return True
       elif response in ['no', 'n']:
          print("\n❌ Assessment cancelled.\n")
