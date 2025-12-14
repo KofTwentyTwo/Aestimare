@@ -2,19 +2,19 @@
 
 **Aestimare** — to assess, evaluate, estimate
 
-A comprehensive, LLM-powered infrastructure assessment tool that analyzes AWS cloud infrastructure and GitHub code repositories to generate detailed security, cost, and quality reports.
+A comprehensive infrastructure assessment tool that analyzes AWS cloud infrastructure and GitHub code repositories to generate detailed security, cost, and quality reports.
 
 ## What is Aestimare?
 
-Aestimare is an automated assessment platform designed to help organizations understand, evaluate, and optimize their cloud infrastructure and codebase. It combines data collection from AWS and GitHub with Large Language Model (LLM) analysis to produce actionable insights aligned with industry best practices.
+Aestimare is an automated assessment platform designed to help organizations understand, evaluate, and optimize their cloud infrastructure and codebase. This toolset has been collected and refined over several years through multiple deployments, and represents battle-tested approaches to infrastructure assessment. Recently, support for Large Language Models (LLMs) has been added to enhance report creation and data analysis capabilities, providing more contextual insights and actionable recommendations.
 
 ### Key Capabilities
 
 - **Multi-Account AWS Assessment**: Analyze multiple AWS accounts simultaneously across different regions
 - **GitHub Repository Analysis**: Assess code quality, security practices, and repository health across entire organizations
-- **LLM-Powered Intelligence**: Uses Claude or GPT to provide contextual analysis against industry standards
 - **Comprehensive Reporting**: Generates structured markdown reports covering security, infrastructure, cost optimization, and code quality
 - **Industry Standards Compliance**: Evaluates against CIS AWS Foundations, AWS Well-Architected Framework, NIST CSF, and OWASP Top 10
+- **Enhanced Analysis** (New): Optional LLM integration for improved report generation and contextual insights
 
 ## How It Works
 
@@ -37,14 +37,16 @@ The tool collects comprehensive data from your infrastructure:
 - Activity metrics (commits, pull requests, issues)
 - Optional: Local repository cloning for deeper analysis
 
-### Phase 2: LLM Analysis
+### Phase 2: Analysis
 
-Collected data is analyzed using Large Language Models (Anthropic Claude or OpenAI GPT) with specialized prompts that:
+Collected data is analyzed to identify issues and opportunities:
 
 - **Security Assessment**: Identifies vulnerabilities, misconfigurations, and compliance gaps
 - **Infrastructure Review**: Evaluates architecture, reliability, performance, and operational excellence
 - **Cost Optimization**: Finds unused resources, right-sizing opportunities, and savings potential
 - **Code Quality**: Assesses repository health, best practices, documentation, and testing coverage
+
+**Enhanced Analysis (Optional)**: When configured, the tool can use Large Language Models (Claude or GPT) to provide more contextual analysis, generate detailed recommendations, and create more comprehensive reports. This enhancement builds upon the core analysis engine that has been refined through years of production use.
 
 ### Phase 3: Report Generation
 
@@ -121,7 +123,7 @@ Each report includes:
 - Python 3.8 or higher
 - AWS CLI configured with read-only profiles
 - GitHub CLI (`gh`) authenticated
-- LLM API key (Anthropic or OpenAI)
+- (Optional) LLM API key (Anthropic or OpenAI) for enhanced analysis
 
 ### Installation
 
@@ -147,7 +149,7 @@ Each report includes:
    # GitHub token
    export GITHUB_TOKEN=ghp_xxxxxxxxxxxx
    
-   # LLM API key (choose one)
+   # (Optional) LLM API key for enhanced analysis (choose one)
    export ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxx
    # OR
    export OPENAI_API_KEY=sk-xxxxxxxxxxxx
@@ -194,7 +196,9 @@ github:
   clone_dir: "../.repos-readonly"
 ```
 
-### LLM Configuration
+### Enhanced Analysis Configuration (Optional)
+
+For enhanced report generation using LLMs:
 
 ```yaml
 llm:
@@ -203,6 +207,8 @@ llm:
   max_tokens: 4096
   temperature: 0.1
 ```
+
+**Note**: LLM integration is optional. The tool works without it, using the core analysis engine that has been refined over years of production deployments. LLM support enhances report quality and provides more contextual recommendations.
 
 See `config/accounts.example.yaml` for complete configuration options.
 
@@ -260,7 +266,7 @@ Aestimare is organized into modular components:
 
 ### Analyzers (`analyzers/`)
 
-- **`llm_analyzer.py`**: LLM-powered analysis engine supporting multiple providers
+- **`llm_analyzer.py`**: Analysis engine with optional LLM integration for enhanced report generation
 
 ### Generators (`generators/`)
 
@@ -268,14 +274,14 @@ Aestimare is organized into modular components:
 
 ### Prompts (`prompts/`)
 
-- Specialized prompts for security, infrastructure, cost, and repository analysis
+- Specialized analysis templates for security, infrastructure, cost, and repository assessment (used with optional LLM integration)
 
 ## Requirements
 
 - **Python**: 3.8+
 - **AWS CLI**: Configured with appropriate profiles
 - **GitHub CLI**: Authenticated (`gh auth login`)
-- **LLM API**: Anthropic or OpenAI API key
+- **LLM API** (Optional): Anthropic or OpenAI API key for enhanced analysis
 
 ## AWS Permissions
 
@@ -288,9 +294,9 @@ For cost data, ensure access to AWS Cost Explorer API.
 
 ## Customization
 
-### Custom Prompts
+### Custom Analysis Templates
 
-Create new prompt files in `prompts/` directory. Prompts should:
+Create new analysis template files in `prompts/` directory for use with optional LLM integration. Templates should:
 - Include `{data}` placeholder for JSON data injection
 - Define expected JSON output format
 - Reference relevant industry standards
@@ -331,12 +337,14 @@ gh auth status
 gh api /user
 ```
 
-### LLM API Issues
+### Enhanced Analysis (LLM) Issues
 
+If using optional LLM integration:
 - Verify API key is set correctly
 - Check API quota and rate limits
 - Ensure network connectivity
 - Review API usage in provider dashboard
+- Note: The tool works without LLM integration using the core analysis engine
 
 ### Data Collection Errors
 
@@ -358,6 +366,10 @@ For issues, questions, or contributions:
 
 - **Issues**: [GitHub Issues](https://github.com/your-org/aestimare/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/your-org/aestimare/discussions)
+
+## About This Release
+
+This is the first public release of Aestimare. The core toolset has been collected and refined over several years through multiple production deployments, representing battle-tested approaches to infrastructure assessment. The recent addition of optional LLM integration enhances report generation and provides more contextual analysis, building upon the proven foundation of the core assessment engine.
 
 ## Disclaimer
 
