@@ -1,0 +1,122 @@
+# Aestimare Configuration
+# Copy this file to accounts.yaml and customize for your environment
+
+# Assessment metadata
+assessment:
+  name: "Infrastructure Assessment"
+  organization: "Your Organization"
+  output_dir: "../reports"
+  data_dir: "../.data"
+
+# AWS Accounts to assess
+aws_accounts:
+  - name: "Production"
+    profile: "prod-readonly"
+    account_id: "123456789012"
+    regions:
+      - "us-east-1"
+      - "us-west-2"
+    enabled: true
+    tags:
+      environment: "production"
+
+  - name: "Development"
+    profile: "dev-readonly"
+    account_id: "234567890123"
+    regions:
+      - "us-east-1"
+    enabled: true
+    tags:
+      environment: "development"
+
+  - name: "Staging"
+    profile: "staging-readonly"
+    account_id: "345678901234"
+    regions:
+      - "us-east-1"
+    enabled: false  # Set to true to include in assessment
+    tags:
+      environment: "staging"
+
+# GitHub organizations to assess
+github:
+  organizations:
+    - name: "your-org"
+      enabled: true
+      include_archived: false
+      include_forks: false
+
+  # GitHub token (or use GITHUB_TOKEN env var)
+  # token: "ghp_xxxxxxxxxxxx"
+
+  # Clone repositories locally for deeper analysis
+  clone_repos: true
+  clone_dir: "../.repos-readonly"
+
+# LLM Configuration
+llm:
+  provider: "anthropic"  # anthropic, openai, or local
+  model: "claude-sonnet-4-20250514"
+  # api_key: ""  # Or use ANTHROPIC_API_KEY env var
+  max_tokens: 4096
+  temperature: 0.1
+
+# Industry standards to compare against
+standards:
+  - "cis-aws-foundations"
+  - "aws-well-architected"
+  - "owasp-top-10"
+  - "nist-csf"
+
+# Services to assess
+aws_services:
+  compute:
+    - ec2
+    - lambda
+    - ecs
+    - eks
+  storage:
+    - s3
+    - ebs
+    - efs
+  database:
+    - rds
+    - dynamodb
+    - elasticache
+    - documentdb
+  networking:
+    - vpc
+    - route53
+    - cloudfront
+    - api-gateway
+  security:
+    - iam
+    - kms
+    - secrets-manager
+    - guardduty
+    - security-hub
+  monitoring:
+    - cloudwatch
+    - cloudtrail
+    - config
+  messaging:
+    - sns
+    - sqs
+
+# Report configuration
+reports:
+  formats:
+    - markdown
+    - json
+  sections:
+    - executive-summary
+    - security-assessment
+    - infrastructure-overview
+    - cost-analysis
+    - recommendations
+
+  # Generate individual reports per account
+  per_account_reports: true
+
+  # Generate consolidated report across all accounts
+  consolidated_report: true
